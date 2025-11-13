@@ -29,7 +29,7 @@ SHEET_NAME = "Complaints"
 POLICY_SHEET = "bulkyfitnessnoon"
 DELIVERED_SHEET = "تم التسليم بلكي نون"
 RETURNED_SHEET = " تم الارجاع بلكي نون"
-ORDERS_SHEET = "Order Number"
+ORDERS_SHEET = "Delivery of shipments"  # ← تم التعديل هنا
 DELIVERED_ARCHIVE = "Delivered Archive bulky noon"
 RETURNED_ARCHIVE = "Returned Archive bulky noon"
 
@@ -49,10 +49,13 @@ returned_sheet = get_or_create_sheet(RETURNED_SHEET)
 delivered_archive_sheet = get_or_create_sheet(DELIVERED_ARCHIVE)
 returned_archive_sheet = get_or_create_sheet(RETURNED_ARCHIVE)
 
-# ====== تحميل شيت Order Number ======
+# ====== تحميل شيت Delivery of shipments ======
 order_sheet = client.open(SHEET_NAME).worksheet(ORDERS_SHEET)
 order_data = order_sheet.get_all_values()
-order_dict = {row[1]: row[3] for row in order_data[1:] if len(row) > 3 and row[3].strip()}
+
+# نفترض أن العمود الثاني يحتوي على "رقم الشحنة"
+order_awb_col_index = 1  # ← رقم العمود (0 = أول عمود، 1 = ثاني عمود)
+order_dict = {row[order_awb_col_index].strip(): True for row in order_data[1:] if len(row) > order_awb_col_index and row[order_awb_col_index].strip()}
 
 # ====== بيانات Aramex ======
 client_info = {
@@ -129,8 +132,8 @@ for idx, row in enumerate(policy_data[1:]):
                 continue
     row[4] = days_diff
     cells[idx].value = days_diff
-    order_num = str(row[0])
-    row[5] = "مشحون" if order_num in order_dict else "غير مشحون"
+    policy_num = str(row[1])  # ← تعديل: نستخدم Policy Number للمطابقة
+    row[5] = "مشحون" if policy_num in order_dict else "غير مشحون"
 policy_sheet.update_cells(cells)
 
 # ====== البحث عن شحنة ======
@@ -151,7 +154,7 @@ if search_order.strip():
     if not found:
         st.error("⚠️ لم يتم العثور على الطلب في الشيت")
 
-# ====== دالة تصنيف الحالة (delivered / returned / other) ======
+# ====== دالة تصنيف الحالة ======
 def check_status(status_text):
     text = status_text.lower()
     delivered_conditions = ["delivered","تم التسليم","shipment charges paid","customer id received","collected by consignee"]
