@@ -330,35 +330,80 @@ if st.button("🔄 تحديث جميع الحالات الآن", use_container_w
 
 # ====== إحصائيات ======
 st.markdown("---")
-all_active      = [r for r in policy_data[1:] if check_status(r[3] if len(r) > 3 else "") == "other"]
-delayed_display = [r for r in all_active if (int(str(r[4]).strip()) if str(r[4]).strip().lstrip('-').isdigit() else 0) > 3]
-current_display = [r for r in all_active if (int(str(r[4]).strip()) if str(r[4]).strip().lstrip('-').isdigit() else 0) <= 3]
 
-col1, col2, col3 = st.columns(3)
+def get_days_val(r):
+    return int(str(r[4]).strip()) if len(r) > 4 and str(r[4]).strip().lstrip('-').isdigit() else 0
+
+all_active      = [r for r in policy_data[1:] if check_status(r[3] if len(r) > 3 else "") == "other"]
+delayed_display = [r for r in all_active if get_days_val(r) > 3]
+current_display = [r for r in all_active if get_days_val(r) <= 3]
+
+# غير مشحون من عندنا وعليه 3 أيام فأكثر (بيتفحص على كل الشحنات النشطة مش بس المتأخرة حسب حالة أرامكس)
+not_shipped_display = [
+    r for r in policy_data[1:]
+    if len(r) >= 6 and r[5].strip() == "غير مشحون" and get_days_val(r) >= 3
+]
+
+# مشحون عندنا لكن لسه واقف/متحركش فى أرامكس (حالته "other") وعليه 3 أيام فأكثر
+stuck_display = [
+    r for r in all_active
+    if len(r) >= 6 and r[5].strip() == "مشحون" and get_days_val(r) >= 3
+]
+
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("📦 إجمالي النشطة", len(all_active))
 col2.metric("⚠️ متأخرة (+3 أيام)", len(delayed_display))
 col3.metric("✅ في الوقت",         len(current_display))
+col4.metric("🚫 غير مشحون (+3 أيام)", len(not_shipped_display))
+col5.metric("🐌 عالقة بأرامكس (+3 أيام)", len(stuck_display))
 
 COLS = ["Order Number", "Policy Number", "Date", "Status", "Days Since Shipment", "حالة الشحن"]
 
 st.markdown("---")
-st.subheader("⚠️ الشحنات المتأخرة (أكثر من 3 أيام)")
-if delayed_display:
-    st.dataframe(
-        pd.DataFrame(normalize_rows(delayed_display), columns=COLS),
-        use_container_width=True, height=400
-    )
-else:
-    st.success("✅ لا توجد شحنات متأخرة!")
+tab_main, tab_not_shipped, tab_stuck = st.tabs([
+    "🏠 الرئيسية",
+    "🚫 غير مشحون (+3 أيام)",
+    "🐌 عالقة بأرامكس (+3 أيام)"
+])
 
-st.markdown("---")
-st.subheader("📦 الشحنات الحالية")
-if current_display:
-    st.dataframe(
-        pd.DataFrame(normalize_rows(current_display), columns=COLS),
-        use_container_width=True, height=400
-    )
-else:
-    st.info("لا توجد شحنات حالياً.")
+with tab_main:
+    st.subheader("⚠️ الشحنات المتأخرة (أكثر من 3 أيام)")
+    if delayed_display:
+        st.dataframe(
+            pd.DataFrame(normalize_rows(delayed_display), columns=COLS),
+            use_container_width=True, height=400
+        )
+    else:
+        st.success("✅ لا توجد شحنات متأخرة!")
+
+    st.markdown("---")
+    st.subheader("📦 الشحنات الحالية")
+    if current_display:
+        st.dataframe(
+            pd.DataFrame(normalize_rows(current_display), columns=COLS),
+            use_container_width=True, height=400
+        )
+    else:
+        st.info("لا توجد شحنات حالياً.")
+
+with tab_not_shipped:
+    st.subheader("🚫 شحنات لم تُشحن من عندنا بعد (3 أيام فأكثر)")
+    if not_shipped_display:
+        st.dataframe(
+            pd.DataFrame(normalize_rows(not_shipped_display), columns=COLS),
+            use_container_width=True, height=400
+        )
+    else:
+        st.success("✅ لا توجد شحنات متأخرة فى الشحن!")
+
+with tab_stuck:
+    st.subheader("🐌 شحنات مشحونة ولم تتحرك فى أرامكس (3 أيام فأكثر)")
+    if stuck_display:
+        st.dataframe(
+            pd.DataFrame(normalize_rows(stuck_display), columns=COLS),
+            use_container_width=True, height=400
+        )
+    else:
+        st.success("✅ لا توجد شحنات عالقة!")
 
 st.caption(f"آخر تحديث: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
